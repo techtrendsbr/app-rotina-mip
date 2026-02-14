@@ -20,7 +20,8 @@
       "Bash(gh repo set-default:*)",
       "Bash(gh repo create:*)",
       "Bash(GIT_ASKPASS=true gh auth:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
