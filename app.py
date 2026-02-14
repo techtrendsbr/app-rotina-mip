@@ -117,7 +117,7 @@ def calculate_sentiment(text: str) -> int:
     negative_count = sum(1 for word in negative_words if word in text_lower)
 
     # Calcular sentimento base
-    base_score = 5 0
+    base_score = 5
     sentiment = base_score + (positive_count * 0.5) - (negative_count * 0.5)
     return max(1, min(10, round(sentiment)))
 
