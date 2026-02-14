@@ -344,9 +344,24 @@ def main():
     try:
         if 'db' not in st.session_state:
             st.session_state.db = SheetManager()
+
+        # Exibir informações de conexão (expander por padrão fechado)
+        with st.expander("🔧 Informações de Conexão (Debug)"):
+            conn_info = st.session_state.db.get_connection_info()
+            st.json(conn_info)
+
+            st.caption(f"""
+            **Ambiente Cloud (Streamlit Cloud):** Adicione `gcp_service_account` em st.secrets
+
+            **Ambiente Local:** Use `service_account.json` ou `service-account.json`
+
+            **Planilha:** `{conn_info['sheet_name']}`
+            """)
+
     except Exception as e:
         st.error(f"❌ Erro ao conectar ao Google Sheets: {str(e)}")
         st.info("💡 Verifique se o arquivo `service_account.json` está correto e se a planilha 'Journal Database' existe.")
+        st.info("📌 **Deploy Cloud:** Configure `st.secrets['gcp_service_account']` no Streamlit Cloud")
         return
 
     # Carregar dados com cache

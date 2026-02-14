@@ -11,7 +11,16 @@
       "Bash(git rm:*)",
       "Bash(git branch:*)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth login:*)",
+      "Bash(gh auth:*)",
+      "Bash(git config:*)",
+      "Bash(gh repo set-default:*)",
+      "Bash(gh repo create:*)",
+      "Bash(GIT_ASKPASS=true gh auth:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

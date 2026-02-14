@@ -28,6 +28,33 @@ streamlit run app.py
 
 A aplicação estará disponível em: `http://localhost:8501`
 
+---
+
+## ☁️ Deploy na Nuvem (Streamlit Cloud)
+
+Para fazer deploy no Streamlit Cloud, siga o guia completo:
+
+📖 **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+
+**Resumo Rápido:**
+
+1. **Fazer push do código** (já está no GitHub: `techtrendsbr/app-rotina-mip`)
+
+2. **Conectar no Streamlit Cloud:**
+   - Acesse: https://cloud.streamlit.io/
+   - New app → Conectar repositório GitHub
+
+3. **Configurar Secrets:**
+   - Settings → Secrets
+   - Adicionar: `gcp_service_account`
+   - Valor: TODO o JSON do seu Google Service Account
+
+4. **Deploy!**
+
+👉 **URL Cloud:** https://cloud.streamlit.io/
+
+---
+
 ## 📊 Funcionalidades
 
 ### Dashboard Principal
