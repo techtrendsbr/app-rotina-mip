@@ -2,11 +2,24 @@
 
 Aplicação web em Python (Streamlit) para dashboard de performance pessoal com integração ao Google Sheets.
 
+## ✨ Status: Pronto para Deploy na Nuvem
+
+- ✅ **Desenvolvimento Local**: Testado e funcional em http://localhost:8501
+- ✅ **Código no GitHub**: https://github.com/techtrendsbr/app-rotina-mip
+- ✅ **Deploy Cloud**: Siga o [CHECKLIST_DEPLOY.md](./CHECKLIST_DEPLOY.md) para instruções completas
+- ✅ **Último Commit**: `c039cf4 - docs: adicionar checklist completo para deploy na Streamlit Cloud`
+
 ## 📋 Pré-requisitos
 
+### Desenvolvimento Local
 - Python 3.8 ou superior
 - Conta Google com planilha "Journal Database"
 - Arquivo `service_account.json` com credenciais do Google Service Account
+
+### Deploy na Nuvem (Streamlit Cloud)
+- Conta no GitHub (repositório já está pronto)
+- Conta Google/Google Cloud (para Service Account)
+- Acesso ao Streamlit Cloud: https://cloud.streamlit.io/
 
 ## 🚀 Instalação e Execução
 
@@ -32,9 +45,7 @@ A aplicação estará disponível em: `http://localhost:8501`
 
 ## ☁️ Deploy na Nuvem (Streamlit Cloud)
 
-Para fazer deploy no Streamlit Cloud, siga o guia completo:
-
-📖 **[DEPLOYMENT.md](./DEPLOYMENT.md)**
+📖 **Consulte o guia completo: [CHECKLIST_DEPLOY.md](./CHECKLIST_DEPLOY.md)**
 
 **Resumo Rápido:**
 
@@ -43,13 +54,19 @@ Para fazer deploy no Streamlit Cloud, siga o guia completo:
 2. **Conectar no Streamlit Cloud:**
    - Acesse: https://cloud.streamlit.io/
    - New app → Conectar repositório GitHub
+   - Branch: `main`
+   - Main file: `app.py`
 
 3. **Configurar Secrets:**
    - Settings → Secrets
-   - Adicionar: `gcp_service_account`
-   - Valor: TODO o JSON do seu Google Service Account
+   - **Nome do Secret**: `service_account_file_content`
+   - **Valor**: TODO o JSON do seu Google Service Account (como string)
+   - Copie todo o conteúdo do arquivo `service_account.json` local
 
 4. **Deploy!**
+   - Clique em "Deploy app"
+   - Aguarde 2-5 minutos
+   - Seu app estará em: `https://app-rotina-mip.streamlit.app`
 
 👉 **URL Cloud:** https://cloud.streamlit.io/
 
