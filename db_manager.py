@@ -44,53 +44,53 @@ class SheetManager:
 
     def _try_secrets_specific(self) -> Optional[gspread.Client]:
         """
-        Tenta autenticar usando st.secrets['gcp_service_account'].
+        Tenta autenticar usando st.secrets['service_account_file_content'].
 
         Returns:
             gspread.Client ou None se falhar
         """
         try:
             import streamlit as st
-            print(f"🔍 DEBUG: Tentando st.secrets['gcp_service_account']...")
+            print(f"🔍 DEBUG: Tentando st.secrets['service_account_file_content']...")
 
-            # Tentar ler a chave específica
-            secret_value = st.secrets.get('gcp_service_account')
+            # Tentar ler o JSON completo como string (MÉTODO NOVO: JSON Payload)
+            secret_value = st.secrets.get('service_account_file_content')
 
             if secret_value is None:
-                print(f"⚠️  DEBUG: Chave 'gcp_service_account' não encontrada em st.secrets")
+                print(f"⚠️  DEBUG: Chave 'service_account_file_content' não encontrada em st.secrets")
                 return None
 
-            print(f"✅ DEBUG: Secret encontrado! Tipo: {type(secret_value)}")
+            print(f"✅ DEBUG: Secret encontrado! Tipo: {type(secret_value)}, Tamanho: {len(secret_value)} caracteres")
 
-            # Converter para dict baseado no tipo
-            if isinstance(secret_value, dict):
-                # Já é um dict (pode ser AttrDict ou dict padrão)
-                credentials_dict = dict(secret_value)
-                print(f"✅ DEBUG: Convertido de dict para dict Python")
-            elif isinstance(secret_value, str):
-                # É uma JSON string
+            # Se for uma string (JSON como texto), fazer parse
+            if isinstance(secret_value, str):
                 try:
                     credentials_dict = json.loads(secret_value)
-                    print(f"✅ DEBUG: Parseado de JSON string com sucesso")
+                    print(f"✅ DEBUG: Parseado JSON string com sucesso ({len(credentials_dict)} campos)")
                 except json.JSONDecodeError as e:
                     print(f"❌ DEBUG: Falha ao fazer parse JSON: {e}")
                     return None
-            elif hasattr(secret_value, '__dict__'):
-                # É um AttrDict ou similar, converter para dict
+            elif isinstance(secret_value, dict):
+                # Se for um dict (AttrDict), converter
                 credentials_dict = dict(secret_value)
-                print(f"✅ DEBUG: Convertido de AttrDict para dict Python")
+                print(f"✅ DEBUG: Convertido de dict para dict Python ({len(credentials_dict)} campos)")
             else:
                 print(f"❌ DEBUG: Tipo de secret não suportado: {type(secret_value)}")
                 return None
 
-            # Normalizar a private_key
-            if 'private_key' in credentials_dict:
-                credentials_dict['private_key'] = self._normalize_private_key(credentials_dict['private_key'])
-                print(f"✅ DEBUG: private_key normalizada")
+            # Verificar campos essenciais
+            required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id']
+            missing_fields = [f for f in required_fields if f not in credentials_dict]
+
+            if missing_fields:
+                print(f"❌ DEBUG: Campos faltando no JSON: {missing_fields}")
+                return None
+
+            print(f"✅ DEBUG: Todos os campos essenciais presentes")
 
             # Conectar usando o dict
             gc = gspread.service_account_from_dict(credentials_dict)
-            self.credentials_source = "Streamlit Secrets (chave específica)"
+            self.credentials_source = "Streamlit Secrets (JSON Payload)"
             print(f"✅ DEBUG: gspread.service_account_from_dict() bem-sucedido")
             return gc
 
@@ -100,8 +100,11 @@ class SheetManager:
         except AttributeError as e:
             print(f"⚠️  DEBUG: st.secrets não disponível: {e}")
             return None
+        except json.JSONDecodeError as e:
+            print(f"❌ DEBUG: Erro ao fazer parse JSON: {e}")
+            return None
         except Exception as e:
-            print(f"❌ DEBUG: Erro em st.secrets['gcp_service_account']: {type(e).__name__}: {e}")
+            print(f"❌ DEBUG: Erro em st.secrets['service_account_file_content']: {type(e).__name__}: {e}")
             return None
 
     def _try_secrets_root(self) -> Optional[gspread.Client]:
@@ -220,8 +223,8 @@ class SheetManager:
         print(f"📋 Planilha alvo: '{self.sheet_name}'")
         print(f"{'='*60}\n")
 
-        # Tentar 1: Streamlit Secrets (chave específica)
-        gc = self._try_secrets_specific()
+        # Tentar 1: Streamlit Secrets (JSON Payload) - PRIORIDADE NOVA
+        gc = self._try_secrets_specific_json()
         if gc:
             try:
                 self.gc = gc
