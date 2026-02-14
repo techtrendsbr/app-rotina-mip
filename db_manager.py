@@ -29,51 +29,102 @@ class SheetManager:
     def _connect(self):
         """Estabelece conexão com o Google Sheets.
 
-        Tenta autenticar na seguinte ordem:
-        1. Streamlit Secrets (ambiente cloud)
-        2. Arquivo local service_account.json (desenvolvimento)
+        Prioridade de autenticação:
+        1. Streamlit Secrets (Cloud) - PRIORIDADE
+        2. Arquivo local (Desenvolvimento)
+
+        Importante: st.secrets retorna AttrDict, não JSON string.
         """
         try:
-            # Tentar 1: Arquivo local (Desenvolvimento local) - PRIORIDADE LOCAL
+            # ============================================================
+            # MÉTODO 1: Streamlit Secrets (Cloud) - PRIORIDADE
+            # ============================================================
+            try:
+                import streamlit as st
+
+                # Try-except específico para capturar erro do secrets
+                try:
+                    # st.secrets.get() pode retornar:
+                    # - None (chave não existe)
+                    # - str (JSON string do secrets.toml local)
+                    # - AttrDict (do Streamlit Cloud)
+                    secret_value = st.secrets.get('gcp_service_account')
+
+                    if secret_value is not None:
+                        # Converter AttrDict para dict Python padrão se necessário
+                        if hasattr(secret_value, '__dict__'):
+                            # É um AttrDict do Streamlit Cloud
+                            credentials_dict = dict(secret_value)
+                            self.credentials_source = "Streamlit Secrets (Cloud)"
+                        elif isinstance(secret_value, str):
+                            # É uma JSON string (secrets.toml local)
+                            credentials_dict = json.loads(secret_value)
+                            self.credentials_source = "Streamlit Secrets (Local .toml)"
+                        elif isinstance(secret_value, dict):
+                            # Já é um dict
+                            credentials_dict = secret_value
+                            self.credentials_source = "Streamlit Secrets (dict)"
+                        else:
+                            # Tipo inesperado
+                            raise ValueError(f"Tipo de secret não suportado: {type(secret_value)}")
+
+                        # Conectar usando o dict
+                        self.gc = gspread.service_account_from_dict(credentials_dict)
+                        self.sheet = self.gc.open(self.sheet_name).sheet1
+                        print(f"✅ Conectado via Streamlit Secrets ({self.credentials_source}) à planilha: {self.sheet_name}")
+                        return
+
+                except Exception as secret_error:
+                    # Qualquer erro com secrets, tentar método local
+                    print(f"⚠️  Aviso: Não foi possível usar st.secrets: {str(secret_error)}")
+                    pass  # Continuar para método local
+
+            except ImportError:
+                # Streamlit não disponível, continuar para método local
+                pass
+
+            # ============================================================
+            # MÉTODO 2: Arquivo Local (Desenvolvimento)
+            # ============================================================
             credentials_files = ['service_account.json', 'service-account.json']
 
             for cred_file in credentials_files:
                 if os.path.exists(cred_file):
                     self.gc = gspread.service_account(filename=cred_file)
                     self.credentials_source = f"Arquivo local ({cred_file})"
-                    print(f"✅ Conectado via arquivo local à planilha: {self.sheet_name}")
                     self.sheet = self.gc.open(self.sheet_name).sheet1
+                    print(f"✅ Conectado via arquivo local ({cred_file}) à planilha: {self.sheet_name}")
                     return
 
-            # Tentar 2: Streamlit Secrets (Cloud) - SOMENTE se não tiver arquivo local
-            try:
-                import streamlit as st
-                # Usar get() para evitar erros de chave não existente
-                credentials_json = st.secrets.get('gcp_service_account', None)
-                if credentials_json:
-                    credentials_dict = json.loads(credentials_json)
-                    self.gc = gspread.service_account_from_dict(credentials_dict)
-                    self.credentials_source = "Streamlit Secrets (Cloud)"
-                    print(f"✅ Conectado via Streamlit Secrets à planilha: {self.sheet_name}")
-                    self.sheet = self.gc.open(self.sheet_name).sheet1
-                    return
-            except (ImportError, KeyError, AttributeError, json.JSONDecodeError):
-                pass  # Streamlit não disponível ou secret inválida, continuar para erro
-
-            # Se nenhum método funcionou
+            # ============================================================
+            # NENHUM MÉTODO FUNCIONOU
+            # ============================================================
             raise Exception(
-                "Não foi possível encontrar credenciais do Google Service Account.\n\n"
-                "**Ambiente Cloud (Streamlit Cloud):**\n"
-                "1. Abra: https://cloud.streamlit.io/\n"
-                "2. Vá em: Settings → Secrets\n"
-                "3. Adicione: `gcp_service_account` com TODO o JSON do service account\n\n"
-                "**Ambiente Local (Desenvolvimento):**\n"
-                "- Certifique-se de que 'service_account.json' ou 'service-account.json' existe na raiz do projeto.\n"
-                "- Veja .streamlit/secrets.toml.example para configuração local com secrets."
+                "❌ Erro Crítico: Não foi possível encontrar credenciais do Google Service Account.\n\n"
+                "🔧 **Ambiente Cloud (Streamlit Cloud):**\n"
+                "   1. Acesse: https://cloud.streamlit.io/\n"
+                "   2. Seu app → Settings → Secrets\n"
+                "   3. Adicione secret: `gcp_service_account`\n"
+                "   4. Cole o CONTEÚDO JSON (não o nome do arquivo)\n\n"
+                "💻 **Ambiente Local (Desenvolvimento):**\n"
+                "   - Certifique-se de que `service_account.json` ou `service-account.json` existe na raiz do projeto\n"
+                "   - Para usar secrets localmente, copie `.streamlit/secrets.toml.example` para `.streamlit/secrets.toml`\n\n"
+                "📖 **Documentação:** Veja `DEPLOYMENT.md` para instruções detalhadas."
             )
 
         except Exception as e:
-            raise Exception(f"Erro ao conectar ao Google Sheets: {str(e)}")
+            # Capturar erros específicos do gspread ou conexão
+            if 'APIError' in str(type(e).__name__) or 'SpreadsheetNotFound' in str(e):
+                raise Exception(
+                    f"❌ Erro de permissão ou planilha não encontrada.\n\n"
+                    f"Detalhes: {str(e)}\n\n"
+                    "🔧 **Soluções:**\n"
+                    "1. Verifique se o nome da planilha está correto: '{self.sheet_name}'\n"
+                    "2. Certifique-se de que o Service Account tem permissão de editor na planilha\n"
+                    "3. Adicione o email do service account em: Compartilhar → Conceder acesso"
+                )
+            else:
+                raise Exception(f"❌ Erro ao conectar ao Google Sheets: {str(e)}")
 
     def get_connection_info(self) -> Dict[str, str]:
         """
