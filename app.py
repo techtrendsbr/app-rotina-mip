@@ -1,3 +1,4 @@
+# coding: utf-8
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -52,14 +53,8 @@ def parse_sleep_data(text: str) -> float:
 
         total_sleep = wake_time - sleep_time
         return round(total_sleep, 2)
-
-    # Buscar menção direta de horas
-    direct_match = re.search(r'(\d+(?:\.\d+)?)\s*horas?\s*de\s*sono', text.lower())
-    if direct_match:
-        return float(direct_match.group(1))
-
-    return 0.0
-
+    else:
+        return 0.0
 
 def parse_workout(text: str) -> tuple:
     """
@@ -81,8 +76,8 @@ def parse_workout(text: str) -> tuple:
 
     # Identificar tipo de treino
     workout_types = {
-        'musculação': ['musculação', 'musculacao', 'peso', 'força'],
-        'cardio': ['corri', 'corrida', 'cardio', 'bike', 'ciclismo', 'natação', 'natacao'],
+        'musculação': ['musculação', 'musculacao', 'peso', 'força', 'hipertrofia'],
+        'cardio': ['corri', 'corrida', 'bike', 'ciclismo', 'natação', 'natacao'],
         'funcional': ['funcional', 'crossfit', 'hiit']
     }
 
@@ -93,11 +88,7 @@ def parse_workout(text: str) -> tuple:
                 workout_type = w_type
                 break
 
-        if not workout_type:
-            workout_type = "geral"
-
     return (has_workout, workout_type)
-
 
 def calculate_sentiment(text: str) -> int:
     """
@@ -105,31 +96,30 @@ def calculate_sentiment(text: str) -> int:
     Retorna score de 1-10
     """
     if pd.isna(text) or not isinstance(text, str):
-        return 5
+        return 5  # Médio neutro
 
     text_lower = text.lower()
 
     positive_words = [
         'bom', 'ótimo', 'otimo', 'excelente', 'feliz', 'produtivo',
-        'energético', 'energetico', 'motivado', 'foco', 'consegui',
-        'realizei', 'completei', 'sucesso', 'melhor', 'bem'
+        'energético', 'motivado', 'foco', 'consegui',
+        'realizei', 'completei', 'ótima', 'melhor', 'sucesso',
+        'grande', 'maravilhoso'
     ]
 
     negative_words = [
-        'ruim', 'péssimo', 'pessimo', 'cansado', 'triste', 'estressado',
-        'estressado', 'sem energia', 'fracasso', 'erro', 'difícil',
-        'dificil', 'problema', 'preocupação', 'preocupacao', 'ansioso'
+        'ruim', 'péssimo', 'terrível', 'cansado', 'triste',
+        'estressado', 'exaustado', 'sem energia', 'cansado',
+        'difícil', 'falha', 'erro', 'problema', 'pior'
     ]
 
     positive_count = sum(1 for word in positive_words if word in text_lower)
     negative_count = sum(1 for word in negative_words if word in text_lower)
 
-    # Calcular score base (1-10)
-    base_score = 5
+    # Calcular sentimento base
+    base_score = 5 0
     sentiment = base_score + (positive_count * 0.5) - (negative_count * 0.5)
-
     return max(1, min(10, round(sentiment)))
-
 
 def parse_routine_keywords(text: str) -> dict:
     """
@@ -142,26 +132,20 @@ def parse_routine_keywords(text: str) -> dict:
     text_lower = text.lower()
 
     keywords = {
-        'meditacao': ['meditei', 'meditação', 'meditacao', 'mindfulness'],
-        'leitura': ['li', 'livro', 'leitura', 'li livro', 'estudei'],
-        'dieta': ['dieta', 'saudável', 'saudavel', 'comida saudável', 'jejum']
+        'meditacao': ['meditei', 'meditação', 'mindfulness'],
+        'leitura': ['li', 'livro', 'lei', 'estudei']
     }
 
     result = {}
-    for key, words in keywords.items():
-        result[key] = any(word in text_lower for word in words)
+    for habit, keywords in keywords.items():
+        result[habit] = any(keyword in text_lower for keyword in keywords)
 
     return result
-
 
 def process_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Aplica todas as funções de parsing para criar colunas derivadas.
     """
-    if df.empty:
-        return df
-
-    # Criar cópia para evitar SettingWithCopyWarning
     df_processed = df.copy()
 
     # Aplicar parsing
@@ -169,24 +153,20 @@ def process_data(df: pd.DataFrame) -> pd.DataFrame:
     df_processed['Treino'] = df_processed['Mensagem Crua'].apply(lambda x: parse_workout(x)[0])
     df_processed['Tipo Treino'] = df_processed['Mensagem Crua'].apply(lambda x: parse_workout(x)[1])
     df_processed['Sentimento (1-10)'] = df_processed['Mensagem Crua'].apply(calculate_sentiment)
-
-    # Extrair keywords de rotina
-    routine_data = df_processed['Mensagem Crua'].apply(parse_routine_keywords)
-    df_processed['Meditação'] = routine_data.apply(lambda x: x['meditacao'])
-    df_processed['Leitura'] = routine_data.apply(lambda x: x['leitura'])
-    df_processed['Dieta'] = routine_data.apply(lambda x: x['dieta'])
+    df_processed['Meditação'] = df_processed['Mensagem Crua'].apply(lambda x: parse_routine_keywords(x)['meditacao'])
+    df_processed['Leitura'] = df_processed['Mensagem Crua'].apply(lambda x: parse_routine_keywords(x)['leitura'])
+    df_processed['Dieta'] = df_processed['Mensagem Crua'].apply(lambda x: parse_routine_keywords(x)['dieta'])
 
     # Tentar converter coluna Data para datetime
     try:
         df_processed['Data'] = pd.to_datetime(df_processed['Data'], dayfirst=True, errors='coerce')
     except:
-        pass
+        pass  # Se falhar, manter como está
 
-    # Ordenar por data
+    # Ordenar por data (mais recente primeiro)
     df_processed = df_processed.sort_values('Data', ascending=False)
 
     return df_processed
-
 
 # ==========================================
 # FUNÇÕES DE VISUALIZAÇÃO
@@ -207,35 +187,23 @@ def create_temporal_chart(df: pd.DataFrame):
         y=df_sorted['Sono (horas)'],
         mode='lines+markers',
         name='Sono (horas)',
-        line=dict(color='#3498db', width=2),
-        yaxis='y'
+        line=dict(color='#3498db', width=2)
     ))
 
     # Adicionar linha de sentimento
-    fig.add_trace(go.Scatter(
-        x=df_sorted['Data'],
-        y=df_sorted['Sentimento (1-10)'],
-        mode='lines+markers',
-        name='Sentimento (1-10)',
-        line=dict(color='#e74c3c', width=2),
-        yaxis='y2'
-    ))
+    if 'Sentimento (1-10)' in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df_sorted['Data'],
+            y=df_sorted['Sentimento (1-10)'],
+            mode='lines+markers',
+            name='Sentimento',
+            line=dict(color='#e74c3c', width=2),
+            yaxis='y2'
+        ))
 
     fig.update_layout(
         title='📈 Evolução Temporal: Sono x Sentimento',
         xaxis_title='Data',
-        yaxis=dict(
-            title='Sono (horas)',
-            titlefont=dict(color='#3498db'),
-            tickfont=dict(color='#3498db')
-        ),
-        yaxis2=dict(
-            title='Sentimento (1-10)',
-            titlefont=dict(color='#e74c3c'),
-            tickfont=dict(color='#e74c3c'),
-            overlaying='y',
-            side='right'
-        ),
         hovermode='x unified',
         height=400,
         template='plotly_white'
@@ -243,13 +211,11 @@ def create_temporal_chart(df: pd.DataFrame):
 
     return fig
 
-
 def create_workout_heatmap(df: pd.DataFrame):
     """Mapa de calor de treinos."""
     if df.empty or 'Data' not in df.columns:
         return None
 
-    # Garantir que temos coluna de data
     df_temp = df.copy()
     if not pd.api.types.is_datetime64_any_dtype(df_temp['Data']):
         df_temp['Data'] = pd.to_datetime(df_temp['Data'], errors='coerce')
@@ -281,7 +247,6 @@ def create_workout_heatmap(df: pd.DataFrame):
 
     return fig
 
-
 def calculate_kpis(df: pd.DataFrame) -> dict:
     """Calcula KPIs do período."""
     if df.empty:
@@ -299,12 +264,8 @@ def calculate_kpis(df: pd.DataFrame) -> dict:
         'total_days': len(df)
     }
 
-
 def generate_insight(df: pd.DataFrame, kpis: dict) -> str:
     """Gera insight textual sobre os dados."""
-    if df.empty:
-        return "📊 Sem dados suficientes para análise."
-
     insights = []
 
     # Sono
@@ -313,7 +274,7 @@ def generate_insight(df: pd.DataFrame, kpis: dict) -> str:
     elif kpis['avg_sleep'] >= 6:
         insights.append(f"😴 **Sono:** Aceitável, mas pode melhorar ({kpis['avg_sleep']}h/dia)")
     else:
-        insights.append(f"⚠️ **Sono:** Atenção! Média baixa de {kpis['avg_sleep']}h/dia")
+        insights.append(f"⚠️ **Sono:** Atenção! Média baixa: {kpis['avg_sleep']}h/dia")
 
     # Treino
     if kpis['workout_freq'] >= 70:
@@ -325,12 +286,11 @@ def generate_insight(df: pd.DataFrame, kpis: dict) -> str:
 
     # Sentimento
     if kpis['avg_sentiment'] >= 7:
-        insights.append(f"😊 **Humor:** Positivo ({kpis['avg_sentiment']}/10)")
+        insights.append(f"😊 **Sentimento:** Positivo ({kpis['avg_sentiment']}/10)")
     elif kpis['avg_sentiment'] <= 4:
-        insights.append(f"😔 **Humor:** Precisa de atenção ({kpis['avg_sentiment']}/10)")
+        insights.append(f"😔 **Sentimento:** Precisa de atenção ({kpis['avg_sentiment']}/10)")
 
     return "\n\n".join(insights)
-
 
 # ==========================================
 # INTERFACE STREAMLIT
@@ -345,23 +305,9 @@ def main():
         if 'db' not in st.session_state:
             st.session_state.db = SheetManager()
 
-        # Exibir informações de conexão (expander por padrão fechado)
-        with st.expander("🔧 Informações de Conexão (Debug)"):
-            conn_info = st.session_state.db.get_connection_info()
-            st.json(conn_info)
-
-            st.caption(f"""
-            **Ambiente Cloud (Streamlit Cloud):** Adicione `gcp_service_account` em st.secrets
-
-            **Ambiente Local:** Use `service_account.json` ou `service-account.json`
-
-            **Planilha:** `{conn_info['sheet_name']}`
-            """)
-
     except Exception as e:
         st.error(f"❌ Erro ao conectar ao Google Sheets: {str(e)}")
         st.info("💡 Verifique se o arquivo `service_account.json` está correto e se a planilha 'Journal Database' existe.")
-        st.info("📌 **Deploy Cloud:** Configure `st.secrets['gcp_service_account']` no Streamlit Cloud")
         return
 
     # Carregar dados com cache
@@ -390,146 +336,88 @@ def main():
         min_date = df['Data'].min()
         max_date = df['Data'].max()
 
-        col1, col2 = st.sidebar.columns(2)
+        col1, col2 = st.columns(2)
         with col1:
             start_date = st.date_input("Data Início", value=min_date)
         with col2:
             end_date = st.date_input("Data Fim", value=max_date)
 
-        # Presets
-        st.sidebar.markdown("**Presets Rápidos:**")
-        preset_col1, preset_col2 = st.sidebar.columns(2)
+        if start_date and end_date:
+            df_filtered = df[
+                (pd.to_datetime(df['Data'], errors='coerce') >= pd.to_datetime(start_date)) &
+                (pd.to_datetime(df['Data'], errors='coerce') <= pd.to_datetime(end_date))
+            ]
+        else:
+            df_filtered = df
 
-        with preset_col1:
-            if st.button("7d"):
-                start_date = (max_date - timedelta(days=7)).date()
-                end_date = max_date.date()
-                st.rerun()
-
-        with preset_col2:
-            if st.button("30d"):
-                start_date = (max_date - timedelta(days=30)).date()
-                end_date = max_date.date()
-                st.rerun()
-
-        # Aplicar filtro
-        df_filtered = df[
-            (pd.to_datetime(df['Data']) >= pd.to_datetime(start_date)) &
-            (pd.to_datetime(df['Data']) <= pd.to_datetime(end_date))
-        ]
-    else:
-        df_filtered = df
+        st.write(f"**Período Selecionado:** {len(df_filtered)} dias")
 
     # KPIs na Sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.header("📌 KPIs do Período")
-
     kpis = calculate_kpis(df_filtered)
 
-    st.sidebar.metric("📅 Dias Analisados", kpis['total_days'])
-    st.sidebar.metric("😴 Sono Médio", f"{kpis['avg_sleep']}h")
-    st.sidebar.metric("💪 Frequência Treino", f"{kpis['workout_freq']}%")
-    st.sidebar.metric("😊 Sentimento Médio", f"{kpis['avg_sentiment']}/10")
+    st.metric("📅 Dias Analisados", kpis['total_days'])
+    st.metric("😴 Sono Médio", f"{kpis['avg_sleep']}h")
+    st.metric("💪 Frequência Treino", f"{kpis['workout_freq']}%")
+    st.metric("😊 Sentimento Médio", f"{kpis['avg_sentiment']}/10")
 
-    # Insight
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("💡 **Insight do Período:**")
-    st.sidebar.markdown(generate_insight(df_filtered, kpis))
+    st.markdown("---")
+    st.markdown(f"**Insight do Período:** {generate_insight(df_filtered, kpis)}")
 
     # ==========================================
     # ABA PRINCIPAL
     # ==========================================
     tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📝 Editor", "➕ Adicionar Novo"])
 
-    # ==========================================
-    # TAB 1: DASHBOARD
-    # ==========================================
     with tab1:
+        st.subheader("Dashboard de Performance")
+
         if df_filtered.empty:
-            st.info("📊 Sem dados para exibir no período selecionado.")
+            st.info("📊 Sem dados para exibir no período selecionado")
         else:
             col1, col2 = st.columns(2)
 
             with col1:
                 fig_temporal = create_temporal_chart(df_filtered)
-                if fig_temporal:
-                    st.plotly_chart(fig_temporal, use_container_width=True)
+                st.plotly_chart(fig_temporal, use_container_width=True)
 
             with col2:
                 fig_heatmap = create_workout_heatmap(df_filtered)
-                if fig_heatmap:
-                    st.plotly_chart(fig_heatmap, use_container_width=True)
+                st.plotly_chart(fig_heatmap, use_container_width=True)
 
             # Gráficos de rosca para hábitos
             col3, col4, col5 = st.columns(3)
 
-            with col3:
-                if df_filtered['Meditação'].sum() > 0:
-                    fig_meditation = px.pie(
-                        values=[df_filtered['Meditação'].sum(), len(df_filtered) - df_filtered['Meditação'].sum()],
-                        names=['Sim', 'Não'],
-                        title='🧘 Meditação',
-                        hole=0.6
-                    )
-                    st.plotly_chart(fig_meditation, use_container_width=True)
+            habit_names = {'Meditação': '🧘 Meditação', 'Leitura': '📚 Leitura', 'Dieta': '🥗 Dieta Saudável'}
 
-            with col4:
-                if df_filtered['Leitura'].sum() > 0:
-                    fig_reading = px.pie(
-                        values=[df_filtered['Leitura'].sum(), len(df_filtered) - df_filtered['Leitura'].sum()],
+            for i, (habit, name) in enumerate(habit_names.items(), start=1):
+                if df_filtered[habit].sum() > 0:
+                    fig = px.pie(
+                        values=[df_filtered[habit].sum(), len(df_filtered) - df_filtered[habit].sum()],
                         names=['Sim', 'Não'],
-                        title='📚 Leitura',
-                        hole=0.6
+                        hole=0.6,
+                        title=f'{name}'
                     )
-                    st.plotly_chart(fig_reading, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True)
 
-            with col5:
-                if df_filtered['Dieta'].sum() > 0:
-                    fig_diet = px.pie(
-                        values=[df_filtered['Dieta'].sum(), len(df_filtered) - df_filtered['Dieta'].sum()],
-                        names=['Sim', 'Não'],
-                        title='🥗 Dieta Saudável',
-                        hole=0.6
-                    )
-                    st.plotly_chart(fig_diet, use_container_width=True)
-
-    # ==========================================
-    # TAB 2: EDITOR
-    # ==========================================
     with tab2:
-        st.subheader("📝 Editor de Registros")
+        st.subheader("Editor de Registros")
 
         if df_filtered.empty:
-            st.info("📊 Sem dados para editar.")
+            st.info("📊 Sem dados para editar")
         else:
-            # Mostrar dataframe editável
             df_display = df_filtered[['Data', 'Mensagem Crua', 'Resposta']].copy()
+            df_display['Data'] = pd.to_datetime(df_display['Data'], errors='coerce').dt.strftime('%d/%m/%Y')
+            df_display['Data'] = pd.to_datetime(df_display['Data'], errors='coerce').dt.strftime('%d/%m/%Y')
 
-            # Converter data para formato de exibição
-            df_display['Data'] = pd.to_datetime(df_display['Data']).dt.strftime('%d/%m/%Y')
+            edited_df = st.data_editor(df_display, num_rows="dynamic", use_container_width=True)
 
-            edited_df = st.data_editor(
-                df_display,
-                num_rows="dynamic",
-                use_container_width=True,
-                hide_index=True
-            )
+            if st.button("💾 Salvar Alterações"):
+                st.success("✅ Alterações salvas na planilha!")
+                st.info("💡 Nota: A sincronização bidirecional com Google Sheets será implementada na próxima versão.")
 
-            # Botão para salvar alterações
-            col1, col2 = st.columns(2)
+            if st.button("🗑️ Deletar Linhas Selecionadas"):
+                st.warning("⚠️ Funcionalidade de deleção será implementada na próxima versão.")
 
-            with col1:
-                if st.button("💾 Salvar Alterações", type="primary"):
-                    st.success("✅ Alterações salvas na planilha!")
-                    st.info("💡 Nota: A sincronização com o Google Sheets será implementada na próxima versão.")
-
-            with col2:
-                if st.button("🗑️ Deletar Linhas Selecionadas"):
-                    st.warning("⚠️ Funcionalidade de deleção será implementada na próxima versão.")
-
-    # ==========================================
-    # TAB 3: ADICIONAR NOVO
-    # ==========================================
     with tab3:
         st.subheader("➕ Adicionar Novo Registro")
 
@@ -537,55 +425,35 @@ def main():
 
         with col1:
             new_date = st.date_input("Data", value=datetime.now().date())
+            new_text = st.text_area("📝 Mensagem (Texto Narrativo)", placeholder="Descreva seu dia...")
 
-        with col2:
-            st.write("")  # Spacer
-            st.write(f"**Data Selecionada:** {new_date.strftime('%d/%m/%Y')}")
-
-        new_text = st.text_area(
-            "📝 Mensagem (Texto Narrativo)",
-            placeholder="Ex: Hoje acordei às 7h, dormi bem. Treinei perna e me sinto produtivo...",
-            height=150
-        )
-
-        col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
 
         with col1:
             if st.button("➕ Adicionar Registro", type="primary", use_container_width=True):
-                if new_text.strip():
-                    try:
-                        date_str = new_date.strftime('%d/%m/%Y')
-                        st.session_state.db.append_data(date_str, new_text)
-                        st.success(f"✅ Registro adicionado: {date_str}")
-                        st.cache_data.clear()  # Limpar cache
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Erro ao adicionar: {str(e)}")
-                else:
-                    st.warning("⚠️ Por favor, insira uma mensagem.")
+                try:
+                    date_str = new_date.strftime('%d/%m/%Y')
+                    st.session_state.db.append_data(date_str, new_text)
+                    st.success(f"✅ Registro adicionado: {new_date}")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao adicionar dados: {str(e)}")
 
-        with col2:
-            if st.button("🔄 Limpar Campos", use_container_width=True):
-                st.rerun()
+            with col2:
+                st.write("**Preview do Parsing:**")
 
-        # Preview do parsing
-        if new_text:
-            st.markdown("---")
-            st.markdown("### 👁️ Preview do Parsing")
+                preview_data = {
+                    'Data': new_date.strftime('%d/%m/%Y'),
+                    'Sono (horas)': parse_sleep_data(new_text),
+                    'Treino': parse_workout(new_text)[0],
+                    'Tipo Treino': parse_workout(new_text)[1],
+                    'Sentimento (1-10)': calculate_sentiment(new_text)
+                }
 
-            preview_data = {
-                'Data': new_date.strftime('%d/%m/%Y'),
-                'Sono (horas)': parse_sleep_data(new_text),
-                'Treino': parse_workout(new_text)[0],
-                'Tipo Treino': parse_workout(new_text)[1],
-                'Sentimento (1-10)': calculate_sentiment(new_text)
-            }
+                st.json(preview_data)
 
-            routine_preview = parse_routine_keywords(new_text)
-            preview_data.update(routine_preview)
-
-            st.json(preview_data)
-
+                st.info("💡 O parsing extrairá automaticamente: Sono, Treino, Sentimento e hábitos do texto digitado.")
 
 if __name__ == "__main__":
     main()

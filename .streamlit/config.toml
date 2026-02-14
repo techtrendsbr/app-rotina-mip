@@ -4,7 +4,6 @@ primaryColor = "#FF4B4F"
 
 [client]
 showErrorDetails = true
-maxUploadSize = 200
 
 [runner]
 fastReruns = true
@@ -12,3 +11,6 @@ magicEnabled = true
 
 [logger]
 level = "info"
+
+[browser]
+gatherUsageStats = false
